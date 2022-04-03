@@ -2,6 +2,7 @@ const { ImapFlow } = require('imapflow');
 const config = require('./config');
 const chalk = require('chalk');
 const EventEmitter = require('events');
+const packageInfo = require('./package.json');
 
 /**
  * A connection to a server.
@@ -48,6 +49,12 @@ module.exports = class ImapServer extends EventEmitter {
         info: c => imapLogger.debug(c.msg),
         warn: c => imapLogger.debug(c.msg),
         error: c => imapLogger.debug(c.msg),
+      },
+      clientInfo: {
+        vendor: packageInfo.author,
+        'support-url': packageInfo.bugs.url,
+        name: packageInfo.name,
+        version: packageInfo.version,
       },
       ...config('Server', Error, options),
     });

@@ -8,23 +8,38 @@ const rootLogger = new Logger([
   () => `[${new Date().toISOString()}]`,
 ]);
 
-rootLogger.info('Environment is', process.env.NODE_ENV);
+const env =  process.env.NODE_ENV || 'none';
+rootLogger.info('Environment is', env);
+
+config.load(rootLogger.fork([chalk.red('[config]')]), env);
 
 const imapLogger = rootLogger.fork([chalk.cyan('[imap-server]')]);
-const imaps = Object.entries(config('ImapServers')).map(([name, options]) => new ImapServer(imapLogger, name, options));
-imaps.forEach(server => {
-  server.listen();
-  server.addListener('message', async message => {
-    imapLogger.info('Message from ' + message.server.name);
-    for (const forward of forwards) {
-      const done = await forward.forward(message);
-      if (done) {
-        imapLogger.debug(forward.name + ' marked the message handling as done');
-        return;
+imapLogger.info('Creating all IMAP servers');
+Object
+  .entries(config('ImapServers', Error))
+  .sort(sortEntriesAlphabetically)
+  .map(([name, options]) => new ImapServer(imapLogger, name, options))
+  .forEach(server => {
+    server.listen();
+    server.addListener('message', async message => {
+      imapLogger.info('Message from ' + message.server.name);
+      for (const forward of forwards) {
+        const done = await forward.forward(message);
+        if (done) {
+          imapLogger.debug(forward.name + ' marked the message handling as done');
+          return;
+        }
       }
-    }
+    });
   });
-});
 
 const forwardLogger = rootLogger.fork([chalk.yellow('[forward]')]);
-const forwards = Object.entries(config('Forward')).map(([name, options]) => new Forward(forwardLogger, name, options));
+forwardLogger.info('Creating all forwarders');
+const forwards = Object
+  .entries(config('Forward', Error))
+  .sort(sortEntriesAlphabetically)
+  .map(([name, options]) => new Forward(forwardLogger, name, options));
+
+function sortEntriesAlphabetically(a, b) {
+  return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
+}

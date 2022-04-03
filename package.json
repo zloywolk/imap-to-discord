@@ -28,6 +28,7 @@
     "comment-json": "^4.2.2",
     "deepmerge": "^4.2.2",
     "discord-webhook-node": "^1.1.8",
+    "glob": "^7.2.0",
     "imap": "^0.8.19",
     "imapflow": "^1.0.88",
     "turndown": "^7.1.1"

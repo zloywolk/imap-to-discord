@@ -1,5 +1,6 @@
 const config = require('../config');
 const AllDetector = require('./all');
+const CustomDetector = require('./custom');
 const NamedDetector = require('./named');
 
 module.exports = function detector(logger, options) {
@@ -12,6 +13,7 @@ module.exports = function detector(logger, options) {
   const type = config('Type', undefined, options);
   switch (type) {
     case 'All': return new AllDetector(logger, options);
+    case 'Custom': return new CustomDetector(logger, options);
     case 'Named': return new NamedDetector(logger, options);
     default: {
       logger.error('Unknown detector type ' + type);
