@@ -19,18 +19,25 @@ Object
   .entries(config('ImapServers', Error))
   .sort(sortEntriesAlphabetically)
   .map(([name, options]) => new ImapServer(imapLogger, name, options))
-  .forEach(server => {
-    server.listen();
-    server.addListener('message', async message => {
-      imapLogger.info('Message from ' + message.server.name);
-      for (const forward of forwards) {
-        const done = await forward.forward(message);
-        if (done) {
-          imapLogger.debug(forward.name + ' marked the message handling as done');
-          return;
+  .forEach(async server => {
+    try {
+      imapLogger.debug('Starting server', server.name);
+      await server.listen();
+      imapLogger.debug('Adding event listeners to server', server.name);
+      server.addListener('message', async message => {
+        imapLogger.info('Message from ' + message.server.name);
+        for (const forward of forwards) {
+          const done = await forward.forward(message);
+          if (done) {
+            imapLogger.debug(forward.name + ' marked the message handling as done');
+            return;
+          }
         }
-      }
-    });
+      });
+    } catch(error) {
+      imapLogger.error('Failed to start server', server.name, error);
+      process.exit(1);
+    }
   });
 
 const forwardLogger = rootLogger.fork([chalk.yellow('[forward]')]);

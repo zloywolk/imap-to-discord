@@ -39,16 +39,25 @@ module.exports = class ImapServer extends EventEmitter {
     this.mailbox = config('Mailbox', 'INBOX', options);
     this.lastSeq = null;
     const imapLogger = this.logger.fork([chalk.grey('[imap]')]);
+    function imapLog(level, c) {
+      if (level === 'error' || c.err) {
+        imapLogger.error('An error occurred', c);
+      } else if (c.msg) {
+        imapLogger.log(level, c.msg)
+      } else {
+        imapLogger.log(level, c)
+      }
+    }
     /**
      * The server to use.
      * @type {ImapFlow} The ImapFlow library client.
      */
     this.client = new ImapFlow({
       logger: {
-        debug: c => imapLogger.debug(c.msg),
-        info: c => imapLogger.debug(c.msg),
-        warn: c => imapLogger.debug(c.msg),
-        error: c => imapLogger.debug(c.msg),
+        debug: c => imapLog('debug', c),
+        info: c => imapLog('info', c),
+        warn: c => imapLog('warn', c),
+        error: c => imapLog('error', c),
       },
       clientInfo: {
         vendor: packageInfo.author,
