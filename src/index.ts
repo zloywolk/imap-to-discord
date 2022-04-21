@@ -1,9 +1,11 @@
-import ImapServer from './source/imap';
+import 'isomorphic-fetch';
 import config from './config';
 import chalk from 'chalk';
 import Logger from './log';
 import Forward from './forward';
 import { KVP } from './types';
+import createSource from './source';
+import Thing from './thing/thing';
 
 const rootLogger = new Logger([
   () => `[${new Date().toISOString()}]`,
@@ -14,29 +16,29 @@ rootLogger.info('Environment is', env);
 
 config.load(rootLogger.fork([chalk.red('[config]')]), env);
 
-const imapLogger = rootLogger.fork([chalk.cyan('[imap-server]')]);
-imapLogger.info('Creating all IMAP servers');
+const spourceLogger = rootLogger.fork([chalk.cyan('[source]')]);
+spourceLogger.info('Creating all sources');
 Object
   .entries(config('ImapServers', Error))
   .sort(sortEntriesAlphabetically)
-  .map(([name, options]) => new ImapServer(imapLogger, name, options))
-  .forEach(async server => {
+  .forEach(async ([name, options]) => {
     try {
-      imapLogger.debug('Starting server', server.name);
-      await server.init();
-      imapLogger.debug('Adding event listeners to server', server.name);
-      server.addListener('message', async (message: any) => {
-        imapLogger.info('Message from ' + message.server.name);
+      const source = createSource(spourceLogger.fork([`[${name}]`]), name, options)
+      spourceLogger.debug('Starting source', source.name);
+      await source.init();
+      spourceLogger.debug('Adding event listeners to source', source.name);
+      source.addListener('message', async (thing: Thing) => {
+        spourceLogger.info('Message from ' + name);
         for (const forward of forwards) {
-          const done = await forward.forward(message);
+          const done = await forward.forward(thing);
           if (done) {
-            imapLogger.debug(forward.name + ' marked the message handling as done');
+            spourceLogger.debug(forward.name + ' marked the message handling as done');
             return;
           }
         }
       });
     } catch(error) {
-      imapLogger.error('Failed to start server', server.name, error);
+      spourceLogger.error('Failed to start source', name, error);
       process.exit(1);
     }
   });

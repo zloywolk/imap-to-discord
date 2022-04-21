@@ -1,5 +1,5 @@
 const { MessageBuilder } = require("discord-webhook-node");
-const Formatter = require("./formatter");
+const {default: Formatter} = require("./formatter");
 const config = require('../config');
 const path = require('path');
 

@@ -35,12 +35,6 @@ export default class IMAPSource extends Source {
    */
   private lastSeq: number | null = null;
 
-  /**
-   * Creates a new IMAP server.
-   * @param logger The base logger.
-   * @param name The name of this server.
-   * @param options Options for the IMAP client
-   */
   constructor(logger: Logger, name: string, options: any) {
     super(logger, name, options);
     this.logger.debug('Creating IMAP server');

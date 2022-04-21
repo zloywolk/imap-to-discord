@@ -1,15 +1,16 @@
 import config from "../config";
 import Logger from "../log";
+import GraphSource from "./graph";
+import IMAPSource from "./imap";
 
-export default function source(logger: Logger, options: any) {
+export default function source(logger: Logger, name: string, options: any) {
   const type = config('Type', Error, options);
   switch (type) {
-    case 'IMAP': return new AllDetector(logger, options);
-    case 'Custom': return new CustomDetector(logger, options);
-    case 'Named': return new NamedDetector(logger, options);
+    case 'IMAP': return new IMAPSource(logger, name, options);
+    case 'Graph': return new GraphSource(logger, name, options);
     default: {
-      logger.error('Unknown detector type ' + type);
-      throw new Error('Unknown detector type ' + type);
+      logger.error('Unknown source type ' + type);
+      throw new Error('Unknown source type ' + type);
     }
   }
 }

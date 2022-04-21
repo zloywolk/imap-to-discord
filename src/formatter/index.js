@@ -1,7 +1,7 @@
 const config = require('../config');
 const CustomFormatter = require('./custom');
-const DebugFormatter = require('./debug');
-const DefaultFormatter = require('./default');
+const {default: DebugFormatter} = require('./debug');
+const {default: DefaultFormatter} = require('./default');
 
 module.exports = function formatter(logger, options) {
   if (!options) {
