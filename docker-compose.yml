@@ -1,0 +1,11 @@
+version: '3.5'
+
+services:
+  imaptodiscord:
+    container_name: imaptodiscord
+    image: imaptodiscord
+    environment:
+      - NODE_ENV=development
+    volumes:
+       - ./appsettings.development:/imaptodiscord/appsettings.development
+    restart: unless-stopped

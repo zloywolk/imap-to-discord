@@ -1,0 +1,19 @@
+# Same as development version
+FROM node:14
+
+# Create app directory
+WORKDIR /imaptodiscord
+
+# Install app dependencies
+# A wildcard is used to ensure both package.json AND package-lock.json are copied
+# where available (npm@5+)
+COPY package*.json ./
+RUN npm ci --only=production
+
+# Bundle app source
+COPY src src
+COPY ./appsettings-docker.jsonc ./appsettings.jsonc
+
+# Run
+ENV NODE_ENV=production
+CMD [ "node", "src/index.js" ]
