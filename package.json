@@ -2,7 +2,7 @@
   "name": "imap-to-discord",
   "version": "1.0.0",
   "description": "Receives e-mails and forwards them to a discord webhook",
-  "main": "index.js",
+  "main": "src/index.js",
   "scripts": {
     "start": "cross-env NODE_ENV=development node ."
   },
@@ -28,6 +28,7 @@
     "comment-json": "^4.2.2",
     "deepmerge": "^4.2.2",
     "discord-webhook-node": "^1.1.8",
+    "fs-extra": "^10.1.0",
     "glob": "^7.2.0",
     "imap": "^0.8.19",
     "imapflow": "^1.0.88",
