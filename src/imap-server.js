@@ -133,6 +133,11 @@ module.exports = class ImapServer extends EventEmitter {
     await this.client.connect();
     logger.info('Connected');
 
+    const tree = await this.client.listTree();
+    for (const folder of tree.folders) {
+      logger.debug('Available mailbox', folder.path);
+    }
+
     const lock = await this.client.getMailboxLock(this.mailbox);
     try {
       this.client.addListener('exists', opts => this.onExists(opts));

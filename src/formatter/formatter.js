@@ -18,6 +18,10 @@ const TurndownService = require('turndown');
 
   }
 
+  /**
+   * Formats the message.
+   * @param {import('imapflow').FetchMessageObject} message The message.
+   */
   async format() {
     throw new Error('Not implemented');
   }
