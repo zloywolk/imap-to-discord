@@ -25,11 +25,17 @@ const TurndownService = require('turndown');
   /**
    * Limits the string length for discord safety.
    * @param {string} str The string
-   * @param {number} to Override length
+   * @param {{length?: number, prefix?: string, suffix?: string}} opts Options
    * @returns The trimmed string
    */
-  limit(str, to = 1024) {
-    return str.substring(0, to) || '\u200B';
+  limit(str, opts = {}) {
+    const prefix = opts.prefix === undefined ? '' : opts.prefix;
+    const suffix = opts.suffix === undefined ? '' : opts.suffix;
+    const length = (opts.length === undefined ? 1024 : opts.length) - prefix.length - suffix.length;
+    if (str && str.length > length - 3) {
+      return prefix + str.substring(0, length - 3) + '...' + suffix;
+    }
+    return prefix + (str || '\u200B') + suffix;
   }
 
   /**
