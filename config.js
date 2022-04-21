@@ -12,7 +12,7 @@ function readConfig(suffix) {
   const directory = path.join(__dirname, suffix ? `./appsettings.${suffix}` : './appsettings');
   const fileJson = directory + '.json';
   const fileJsonc = directory + '.json';
-  let files = glob.sync(path.join(directory, '**/*.{json,jsonc}'));
+  let files = glob.sync(path.join(directory, '**/*.{json,jsonc,json5}'));
   if (fs.existsSync(fileJson)) {
     files = [fileJson, ...files];
   }
