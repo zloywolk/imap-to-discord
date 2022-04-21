@@ -26,7 +26,7 @@ module.exports = class CustomFormatter extends Formatter {
   format(message) {
     this.messageBuilder = new MessageBuilder();
     if (typeof this.module.format === 'function') {
-      return this.module.format.call(this, this.options, this);
+      return this.module.format.call(this, message, this);
     } else if (typeof this.module === 'function') {
       return this.module.call(this, message, this);
     }

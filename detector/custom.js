@@ -16,11 +16,11 @@ module.exports = class CustomDetector extends Detector {
     }
   }
 
-  detect() {
+  detect(value) {
     if (typeof this.module.detect === 'function') {
-      return this.module.detect.call(this, this.options, this);
+      return this.module.detect.call(this, value, this);
     } else if (typeof this.module === 'function') {
-      return this.module.call(this, message, this);
+      return this.module.call(this, value, this);
     }
     this.logger.error('No detect function provided. Please either use `module.exports = function(value) { ... }` or `module.exports = { init(options) { ... }, detect(value) { ... } }`');
     throw new Error('No detect function provided.');
