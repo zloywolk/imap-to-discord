@@ -1,53 +1,54 @@
-const { ImapFlow } = require('imapflow');
-const config = require('./config');
-const chalk = require('chalk');
-const EventEmitter = require('events');
-const packageInfo = require('../package.json');
-const { stringify, parse } = require('comment-json');
-const fs = require('fs-extra');
-const path = require('path');
+import Logger, { LogLevel } from "../log";
+import Source from "./source";
+import { FetchMessageObject, ImapFlow } from 'imapflow';
+import config from '../config';
+import chalk from 'chalk';
+import packageInfo from '../../package.json';
+import { stringify, parse } from 'comment-json';
+import fs from 'fs-extra';
+import path from 'path';
+import { KVP } from "../types";
 
 /**
  * A connection to a server.
  */
-module.exports = class ImapServer extends EventEmitter {
+export default class IMAPSource extends Source {
+  /**
+   * The flag to add to messages to indicate that we have handled them. Marks them as read by default.
+   */
+  private readonly flag: string;
+  /**
+   * The mailbox to use.
+   */
+  private readonly mailbox: string;
+  /**
+   * Should the server cache its state between restarts?
+   */
+  private readonly cache: boolean;
+    /**
+     * The server to use.
+     * @type {ImapFlow} The ImapFlow library client.
+     */
+  private readonly client: ImapFlow;
+  /**
+   * The last sequence ID read.
+   */
+  private lastSeq: number | null = null;
+
   /**
    * Creates a new IMAP server.
-   * @param {import('./log')} logger The base logger.
-   * @param {string} name The name of this server.
-   * @param {any} options Options for the IMAP client
+   * @param logger The base logger.
+   * @param name The name of this server.
+   * @param options Options for the IMAP client
    */
-  constructor(logger, name, options) {
-    super();
-    /**
-     * The name of the server.
-     * @type {string} Any string.
-     */
-    this.name = name;
-    /**
-     * The logger.
-     * @type {import('./log')} Logger instance.
-     */
-    this.logger = logger.fork([`[${this.name}]`]);
+  constructor(logger: Logger, name: string, options: any) {
+    super(logger, name, options);
     this.logger.debug('Creating IMAP server');
-    /**
-     * The flag to add to messages to indicate that we have handled them. Marks them as read by default.
-     * @type {string} Any string allowed by the mail server.
-     */
     this.flag = config('Flag', '\\Seen', options);
-    /**
-     * The mailbox to use.
-     * @type {string} Any string existing on the mail server.
-     */
     this.mailbox = config('Mailbox', 'INBOX', options);
-    /**
-     * Should the server cache its state between restarts?
-     * @type {boolean} Is the cache enabled?
-     */
     this.cache = config('Cache', true, options);
-    this.lastSeq = null;
     const imapLogger = this.logger.fork([chalk.grey('[imap]')]);
-    function imapLog(level, c) {
+    function imapLog(level: LogLevel, c: any) {
       if (level === 'error' || c.err) {
         imapLogger.error('An error occurred', c);
       } else if (c.msg) {
@@ -56,10 +57,6 @@ module.exports = class ImapServer extends EventEmitter {
         imapLogger.log(level, c)
       }
     }
-    /**
-     * The server to use.
-     * @type {ImapFlow} The ImapFlow library client.
-     */
     this.client = new ImapFlow({
       logger: {
         debug: c => imapLog('debug', c),
@@ -77,7 +74,7 @@ module.exports = class ImapServer extends EventEmitter {
     });
   }
 
-  async onExists(opts) {
+  async onExists(opts: any) {
     const logger = this.logger.fork([chalk.magenta('[listen]')]);
     const newCount = opts.count - opts.prevCount;
     logger.debug('Got ' + newCount + ' new mails in ' + opts.path);
@@ -85,11 +82,11 @@ module.exports = class ImapServer extends EventEmitter {
     const lock = await this.client.getMailboxLock(this.mailbox);
     try {
       const msgs = [];
-      if (this.lastSeq === null) {
+      if (this.lastSeq === null && typeof this.client.mailbox !== 'boolean') {
         this.lastSeq = this.client.mailbox.exists - newCount;
       }
       // Following messages
-      for await (const message of this.client.fetch((this.lastSeq + 1) + ':*', {
+      for await (const message of this.client.fetch((this.lastSeq === null ? 0 : this.lastSeq + 1) + ':*', {
         envelope: true,
         flags: true,
         bodyParts: ['TEXT'],
@@ -100,9 +97,9 @@ module.exports = class ImapServer extends EventEmitter {
       }
       for (const message of msgs) {
         this.logMessage(logger, 'debug', message, 'Marking with flag', this.flag);
-        message.server = this;
+        (message as any).server = this;
         this.emit('message', message);
-        await this.client.messageFlagsAdd(message, [this.flag]);
+        await this.client.messageFlagsAdd((message as any), [this.flag]);
       }
       await this.saveCache();
     } catch(error) {
@@ -116,13 +113,13 @@ module.exports = class ImapServer extends EventEmitter {
 
   /**
    * Logs an IMAP message.
-   * @param {import('imapflow').FetchMessageObject} message The message.
+   * @param message The message.
    */
-  logMessage(logger, level, message, ...args) {
+  logMessage(logger: Logger, level: LogLevel, message: FetchMessageObject, ...args: unknown[]) {
     logger.log(level, ...args, `UID(${message.uid}) SEQ(${message.seq}) ${message.envelope?.subject}`);
   }
 
-  async listen() {
+  async init() {
     const logger = this.logger.fork([chalk.magenta('[listen]')]);
 
     // Wait until client connects and authorizes
@@ -178,8 +175,8 @@ module.exports = class ImapServer extends EventEmitter {
     }
     logger.debug('Loading file', file);
     try {
-      const data = fs.readFile(file, 'utf8');
-      const json = parse(data);
+      const data = await fs.readFile(file, 'utf8');
+      const json = parse(data) as any;
       this.lastSeq = json.LastSequence || null;
     } catch(error) {
       logger.error('Failed to load cache', error);
@@ -188,9 +185,9 @@ module.exports = class ImapServer extends EventEmitter {
 
   /**
    * Gets the cache file of the imap server. Ensures its directory exists.
-   * @returns {Promise<[string, boolean]>} The path of the file and if it exists.
+   * @returns The path of the file and if it exists.
    */
-  async cacheFile() {
+  async cacheFile(): Promise<KVP<string, boolean>> {
     const cacheLocation = config('CacheLocation', './cache');
     const imapCacheLocation = path.join(cacheLocation, './imap-server/' + this.name);
     await fs.mkdirp(imapCacheLocation);

@@ -1,38 +1,39 @@
-const chalk = require("chalk");
+import chalk from "chalk";
+import { MaybeGenerator } from "./types";
 
-module.exports = class Logger {
+/**
+ * A log level.
+ */
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+/**
+ * A logger.
+ */
+export default class Logger {
   /**
    * Creates a new logger.
-   * @param {(string | () => string)[]} prefixes Prefixes of the logger.
-   * @param {Logger | undefined} base Base logger.
+   * @param prefixes Prefixes of the logger.
+   * @param base Base logger.
    */
-  constructor(prefixes, base = undefined) {
-    /**
-     * Prefixes of the logger.
-     * @type {(string | () => string)[]} A an array of strings or factories.
-     */
-    this.prefixes = prefixes;
-    /**
-     * Base logger
-     * @type {Logger | undefined} Logger instance.
-     */
-    this.base = base;
+  constructor(
+    private readonly prefixes: MaybeGenerator<string>[], 
+    private readonly base?: Logger) {
   }
 
   /**
    * Forks the logger.
-   * @param {(string | () => string)[]} prefixes Prefixes of the logger.
+   * @param prefixes Prefixes of the logger.
    */
-  fork(prefixes) {
+  fork(prefixes: MaybeGenerator<string>[]) {
     return new Logger(prefixes, this);
   }
 
   /**
    * Gets the current prefixes.
-   * @returns {string[]} The prefix strings.
+   * @returns The prefix strings.
    */
   getCurrentPrefixes() {
-    let prefixes = [];
+    let prefixes: string[] = [];
     if (this.base) {
       prefixes = prefixes.concat(...this.base.getCurrentPrefixes());
     }
@@ -45,7 +46,7 @@ module.exports = class Logger {
     return prefixes;
   }
 
-  log(level, ...args) {
+  log(level: LogLevel, ...args: unknown[]) {
     const prefixes = this.getCurrentPrefixes();
     let levelString = `[${level}]`;
     switch (level) {
@@ -65,19 +66,19 @@ module.exports = class Logger {
     console[level](levelString, ...prefixes, ...args);
   }
 
-  debug(...args) {
+  debug(...args: unknown[]) {
     this.log('debug', ...args)
   }
 
-  info(...args) {
+  info(...args: unknown[]) {
     this.log('info', ...args)
   }
 
-  warn(...args) {
+  warn(...args: unknown[]) {
     this.log('warn', ...args)
   }
 
-  error(...args) {
+  error(...args: unknown[]) {
     this.log('error', ...args)
   }
 }

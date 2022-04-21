@@ -1,8 +1,9 @@
-const ImapServer = require('./imap-server');
-const config = require('./config');
-const chalk = require('chalk');
-const Logger = require('./log');
-const Forward = require('./forward');
+import ImapServer from './source/imap';
+import config from './config';
+import chalk from 'chalk';
+import Logger from './log';
+import Forward from './forward';
+import { KVP } from './types';
 
 const rootLogger = new Logger([
   () => `[${new Date().toISOString()}]`,
@@ -22,9 +23,9 @@ Object
   .forEach(async server => {
     try {
       imapLogger.debug('Starting server', server.name);
-      await server.listen();
+      await server.init();
       imapLogger.debug('Adding event listeners to server', server.name);
-      server.addListener('message', async message => {
+      server.addListener('message', async (message: any) => {
         imapLogger.info('Message from ' + message.server.name);
         for (const forward of forwards) {
           const done = await forward.forward(message);
@@ -47,6 +48,6 @@ const forwards = Object
   .sort(sortEntriesAlphabetically)
   .map(([name, options]) => new Forward(forwardLogger, name, options));
 
-function sortEntriesAlphabetically(a, b) {
+function sortEntriesAlphabetically(a: KVP<string, unknown>, b: KVP<string, unknown>) {
   return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0;
 }
