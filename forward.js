@@ -44,6 +44,7 @@ module.exports = class Forward {
   }
 
   async forward(message) {
+    let hadError = false;
     try {
       this.logger.debug('New incoming message');
       if (!(await this.server.detect(message.server))) {
@@ -55,14 +56,34 @@ module.exports = class Forward {
         return false;
       }
       this.logger.info('Will handle incoming message');
-      const format = await this.formatter.format(message);
-      this.logger.debug('Sending to Webhook');
-      await this.webhook.send(format);
+      const formats = this.arrayWrap(await this.formatter.format(message));
+      this.logger.debug('Sending', formats.length, 'message(s) to Webhook');
+      for (const format of formats) {
+        try {
+          await this.webhook.send(format);
+        } catch (err) {
+          hadError = true;
+          this.logger.error('Aborting message processing - Failed to send message to Webhook', err, format);
+          try {
+            await this.webhook.send('Aborting message processing - Failed to send message to Webhook from forward `' + this.name + '`: ' + err.message);
+          } catch {}
+        }
+      }
       this.logger.debug('Done with forward handling');
-      return this.exclusive;
+      return hadError || this.exclusive;
     } catch(error) {
-      this.logger.error('Error in forward', error);
+      this.logger.error('Aborting message processing - Error in forward', error);
+      try {
+        await this.webhook.send('Aborting message processing - Error in forward `' + this.name + '`: ' + error.message);
+      } catch {}
       return true;
     }
+  }
+
+  arrayWrap(arrayOrItem) {
+    if (Array.isArray(arrayOrItem)) {
+      return arrayOrItem;
+    }
+    return [arrayOrItem];
   }
 }
