@@ -2,7 +2,10 @@ const { ImapFlow } = require('imapflow');
 const config = require('./config');
 const chalk = require('chalk');
 const EventEmitter = require('events');
-const packageInfo = require('./package.json');
+const packageInfo = require('../package.json');
+const { stringify, parse } = require('comment-json');
+const fs = require('fs-extra');
+const path = require('path');
 
 /**
  * A connection to a server.
@@ -37,6 +40,11 @@ module.exports = class ImapServer extends EventEmitter {
      * @type {string} Any string existing on the mail server.
      */
     this.mailbox = config('Mailbox', 'INBOX', options);
+    /**
+     * Should the server cache its state between restarts?
+     * @type {boolean} Is the cache enabled?
+     */
+    this.cache = config('Cache', true, options);
     this.lastSeq = null;
     const imapLogger = this.logger.fork([chalk.grey('[imap]')]);
     function imapLog(level, c) {
@@ -96,6 +104,7 @@ module.exports = class ImapServer extends EventEmitter {
         this.emit('message', message);
         await this.client.messageFlagsAdd(message, [this.flag]);
       }
+      await this.saveCache();
     } catch(error) {
       logger.error('Message handler', error);
     } finally {
@@ -115,8 +124,12 @@ module.exports = class ImapServer extends EventEmitter {
 
   async listen() {
     const logger = this.logger.fork([chalk.magenta('[listen]')]);
+
     // Wait until client connects and authorizes
     logger.info('Connecting');
+
+    await this.loadCache();
+
     await this.client.connect();
     logger.info('Connected');
 
@@ -131,5 +144,52 @@ module.exports = class ImapServer extends EventEmitter {
 
     // log out and close connection
     //await client.logout();
+  }
+
+  async saveCache(logger = this.logger.fork([chalk.green('[cache]')])) {
+    if (!this.cache) {
+      return;
+    }
+    logger.debug('Saving cache');
+    const str = stringify({
+      [Symbol.for('before-all')]: [{type: 'LineComment',  value: 'This file contains the cache of the server ' + this.name + '. The file is automatically generated.' }],
+      [Symbol.for('before:LastSequence')] : [{ type: 'LineComment', value: 'The last sequence number handled'}],
+      LastSequence: this.lastSeq,
+    }, null, 2);
+    const [file] = await this.cacheFile();
+    await fs.writeFile(file, str, 'utf8');
+    logger.debug('Written file', file);
+  }
+
+  async loadCache(logger = this.logger.fork([chalk.green('[cache]')])) {
+    if (!this.cache) {
+      return;
+    }
+    logger.debug('Loading cache');
+    const [file, exists] = await this.cacheFile();
+    if (!exists) {
+      logger.warn('No cache file at', file);
+      return;
+    }
+    logger.debug('Loading file', file);
+    try {
+      const data = fs.readFile(file, 'utf8');
+      const json = parse(data);
+      this.lastSeq = json.LastSequence || null;
+    } catch(error) {
+      logger.error('Failed to load cache', error);
+    }
+  }
+
+  /**
+   * Gets the cache file of the imap server. Ensures its directory exists.
+   * @returns {Promise<[string, boolean]>} The path of the file and if it exists.
+   */
+  async cacheFile() {
+    const cacheLocation = config('CacheLocation', './cache');
+    const imapCacheLocation = path.join(cacheLocation, './imap-server/' + this.name);
+    await fs.mkdirp(imapCacheLocation);
+    const file = path.join(imapCacheLocation, './cache.jsonc');
+    return [file, fs.existsSync(file)];
   }
 }

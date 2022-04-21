@@ -8,7 +8,7 @@ const path = require('path');
  */
 module.exports = class CustomFormatter extends Formatter {
   init() {
-    this.file = path.join(__dirname, '..', config('File', Error, this.options));
+    this.file = path.join(__dirname, '../..', config('File', Error, this.options));
     /**
      * @type {Function}
      */

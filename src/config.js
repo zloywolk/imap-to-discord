@@ -9,7 +9,8 @@ const glob = require('glob');
  * @returns {Record<string, any>} The config JSON.
  */
 function readConfig(suffix) {
-  const directory = path.join(__dirname, suffix ? `./appsettings.${suffix}` : './appsettings');
+  const directory = path.join(__dirname, suffix ? `../appsettings.${suffix}` : '../appsettings');
+  logger.debug('Using config directory', directory);
   const fileJson = directory + '.json';
   const fileJsonc = directory + '.json';
   let files = glob.sync(path.join(directory, '**/*.{json,jsonc,json5}'));

@@ -5,7 +5,7 @@ const Detector = require("./detector");
  */
 module.exports = class CustomDetector extends Detector {
   init() {
-    this.file = path.join(__dirname, '..', config('File', Error, this.options));
+    this.file = path.join(__dirname, '../..', config('File', Error, this.options));
     /**
      * @type {Function}
      */
