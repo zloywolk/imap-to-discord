@@ -30,7 +30,7 @@ export async function getCacheData(file: string): Promise<CacheData | null> {
  */
 export async function saveCacheData(file: string, cache: CacheData): Promise<void> {
   await fs.mkdirp(path.dirname(file));
-  const str = stringify(cache, null, 2);
+  const str = stringify(cache, null, 2) + '\n';
   await fs.writeFile(file, str, 'utf8');
 }
 
