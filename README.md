@@ -44,6 +44,8 @@ First you need to configure server(s) (called "Source" in imap-to-discord) to re
 }
 ```
 
+You have have as many sources of as many types as you want with any desired unique name.
+
 Every `IMAP` source supports the following configuration options:
 
 * `Server` - Settings for the IMAP server. See the `options` on [this page](https://imapflow.com/module-imapflow-ImapFlow.html) for documentation. (**Required**)
@@ -89,7 +91,7 @@ Every forward supports the following options:
 * `Formatter` - The formatter to format the mails for discord. (Default: `"Default"`)
 * `Exclusive` - Abort the handling of this mail after this formatter, blocking others from also forwarding it? (Default: `true`)
 
-Many cases will however require most advanced handling for mails than the bare bones configuration above. In this case we can use the `Source`, `Message` and `Formatter` config options of the forward to configure it further.
+Some cases will however require more advanced handling for mails than the bare bones configuration above. In this case we can use the `Source`, `Message` and `Formatter` config options of the forward to configure it further.
 
 ### Limiting the source
 
@@ -116,7 +118,7 @@ This detector limits that the forward `your-forward-1` will only forward mails t
 
 The following detector types are available:
 
-* `All` - The default detectors, allows everything.
+* `All` - The default detector, allows everything.
 * `Named` - Only allows things with a certain name. (Hint: A shorthand for using a case-insensitive named detector is to directly use the name instead of an object like `"Source": "your-imap-server-1"`)
   * `Name` - The name the thing being detected must have. (**Required**)
   * `CaseSenstive` - Must the casing match? (Default: `false`)
@@ -222,7 +224,7 @@ The following formatter types are available:
 * `Custom` - Allows you to write your own formatter using JavaScript.
   * `File` - The path to the JavaScript file containing the code. (**Required**)
 
-    An example formatter sending the amount of bytes of the message content:
+    An example formatter sending the amount of bytes of the mail content:
 
     ```js
     module.exports = {
