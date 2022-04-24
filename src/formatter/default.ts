@@ -6,7 +6,7 @@ import Thing from "../thing/thing";
 interface Include {
   id: string;
   content: boolean;
-  replace: string;
+  replace: string | null;
   append: string;
   preprend: string;
 }
@@ -29,14 +29,14 @@ export default class DefaultFormatter extends Formatter {
       content: config('Include' + id, true, this.options),
       append: config('Append' + id, '', this.options),
       preprend: config('Prepend' + id, '', this.options),
-      replace: config('Replace' + id, '', this.options),
+      replace: config('Replace' + id, null, this.options),
     }
   }
 
   async runInclude(id: string, setFn: (str: string) => Promise<MessageBuilder>, readFn: () => Promise<string | undefined>) {
     const include = this.includes[id];
     let str: undefined | string;
-    if (include.replace) {
+    if (include.replace !== null) {
       str = include.replace;
     } else if (include.content) {
       str = await readFn();
