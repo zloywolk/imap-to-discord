@@ -28,6 +28,7 @@ Object
       await source.init();
       spourceLogger.debug('Adding event listeners to source', source.name);
       source.addListener('message', async (thing: Thing) => {
+        thing = thing.append('source-thing', source.getThing());
         spourceLogger.info('Message from ' + name);
         for (const forward of forwards) {
           const done = await forward.forward(thing);

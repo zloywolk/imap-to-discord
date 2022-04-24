@@ -1,15 +1,21 @@
-import Source from "./source";
-import { ClientSecretCredential } from "@azure/identity";
+import { cacheComment } from "../cache";
 import { Client, PageCollection, PageIterator } from "@microsoft/microsoft-graph-client";
+import { ClientSecretCredential } from "@azure/identity";
 import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";
-import Logger from "../log";
 import config from "../config";
+import Logger from "../log";
+import Source from "./source";
 import Thing from "../thing/thing";
+
+interface Cache {
+  LastId: string;
+  LastDate: string;
+}
 
 /**
  * A source using the Microsoft Graph API for Azure.
  */
-export default class GraphSource extends Source {
+export default class GraphSource extends Source<Cache> {
   /**
    * The Microsoft Graph API client.
    */
@@ -26,6 +32,14 @@ export default class GraphSource extends Source {
    * The last ID handled by this endpoint.
    */
   private lastId: string | null = null;
+  /**
+   * The last date handled by this endpoint.
+   */
+  private lastDate: Date = new Date();
+  /**
+   * Use date or ID handling for mail de-dupe.
+   */
+  private mailDeduplication: 'Id' | 'Date';
 
   constructor(logger: Logger, name: string, options: any) {
     super(logger, name, options);
@@ -36,6 +50,8 @@ export default class GraphSource extends Source {
     this.userId = this.ensureSafeForGraphUrl(config('UserId', Error, options));
     this.mailbox = this.ensureSafeForGraphUrl(config('Mailbox', 'Inbox', options));
     this.pollingInterval = config('PollingInterval', 30000, options);
+    this.mailDeduplication = config('MailDeduplication', 'Date', options);
+    this.logger.debug('Using deduplication strategy', this.mailDeduplication);
 
     const credential = new ClientSecretCredential(this.tenantId, this.clientId, this.clientSecret);
     const authProvider = new TokenCredentialAuthenticationProvider(credential, {
@@ -51,43 +67,87 @@ export default class GraphSource extends Source {
     setInterval(() => this.poll(), this.pollingInterval);
   }
 
+  protected async saveCache() {
+    return {
+      // LastId
+      ...cacheComment('before:LastId', 'The last ID handled. IDs are ephemeral in Azure, and may change at any time. All mails are handled until a mail with this ID is found.  \n!! LEGACY WARNING - Can potentially re-send ALL of your mails to the forward in case of an ID mismatch - Does not work with empty Mailboxes !!\n(Enable with "MailDeduplication": "Id" in source config)'),
+      LastId: this.lastId,
+      // LastDate
+      ...cacheComment('before:LastDate', 'The date of the last message handled. Messages before it will be ignored.\n(Enable with "MailDeduplication": "Date" in source config; default enabled)'),
+      LastDate: this.lastDate.toISOString(),
+    } as Cache;
+  }
+
+  protected async loadCache(cache: Cache) {
+    this.lastId = cache.LastId;
+    this.lastDate = new Date(cache.LastDate);
+  }
+
   async poll() {
-    this.logger.debug('Starting poll with old last ID', this.lastId);
-    const select = [
-      'subject', 'body', 'from', 'toRecipients',
-    ];
-    const res: PageCollection = await this.client.api(`/users/${this.userId}/mailFolders/${this.mailbox}/messages`).select(select).get();
-    let newLastId = this.lastId;
-    const messages: any[] = [];
-    const iterator = new PageIterator(this.client, res, data => {
-      if (this.lastId === data.id) {
-        return false;
+    try {
+      this.logger.debug('Starting poll ( LastId:', this.lastId, 'LastDate:', this.lastDate, ')');
+      const select = [
+        'subject', 'body', 'from', 'toRecipients', 'receivedDateTime',
+      ];
+      const res: PageCollection = await this.client.api(`/users/${this.userId}/mailFolders/${this.mailbox}/messages`).select(select).get();
+      let newLastId = this.lastId;
+      let newLastDate = this.lastDate;
+      const messages: any[] = [];
+      const iterator = new PageIterator(this.client, res, data => {
+        // Should dedupe?
+        const id = data.id;
+        const receivedDateTime = new Date(data.receivedDateTime);
+        switch (this.mailDeduplication) {
+          case 'Date': {
+            if (receivedDateTime <= this.lastDate) {
+              return false;
+            }
+            newLastId = id;
+            newLastDate = receivedDateTime;
+            break;
+          }
+          case 'Id': {
+            if (this.lastId === id) {
+              return false;
+            }
+            // Save even though we dont actually handle the mail since it's the first and ID based handling needs a first one.
+            newLastId = id;
+            newLastDate = receivedDateTime;
+            if (this.lastId === null) {
+              return false;
+            }
+            break;
+          }
+        }
+        // Handle
+        this.logger.debug('New message from Graph', data.subject);
+        messages.push(data);
+        return true;
+      });
+      await iterator.iterate();
+      this.lastId = newLastId;
+      this.lastDate = newLastDate;
+      // Emit messages
+      for (const message of messages) {
+        const thing = this.createMessageThing(message);
+        this.emit('message', thing);
       }
-      newLastId = data.id;
-      if (this.lastId === null) {
-        return false;
-      }
-      this.logger.debug('New message from Graph', data.subject);
-      messages.push(data);
-      return true;
-    });
-    await iterator.iterate();
-    this.lastId = newLastId;
-    // Emit messages
-    for (const message of messages) {
-      const thing = new Thing()
-        .append('id', message.id)
-        .append('type', 'message')
-        .append('subtype', 'message')
-        .append('name', message.subject)
-        .append('content', message.body.content)
-        .append('source', this.name)
-        .append('origin', this.mail(message.from))
-        .append('destination', this.mail(message.toRecipients))
-        .append('source-thing', this.getThing());
-      this.emit('message', thing);
+      this.logger.debug('Finished poll ( LastId:', this.lastId, 'LastDate:', this.lastDate, ')');
+    } catch(err) {
+      this.logger.error('Error while polling', err);
     }
-    this.logger.debug('Finished poll with new last ID', this.lastId);
+  }
+
+  createMessageThing(message: any) {
+    return new Thing()
+      .append('id', message.id)
+      .append('type', 'message')
+      .append('subtype', 'message')
+      .append('name', message.subject)
+      .append('content', message.body.content)
+      .append('source', this.name)
+      .append('origin', this.mail(message.from))
+      .append('destination', this.mail(message.toRecipients));
   }
 
   mail(a: any): null | { id: string, name: string }[] {
@@ -107,7 +167,7 @@ export default class GraphSource extends Source {
     return str;
   }
 
-  protected getThing(): Thing {
+  public getThing(): Thing {
     return super.getThing()
       .append('collection', this.mailbox)
       .append('user', this.userId);

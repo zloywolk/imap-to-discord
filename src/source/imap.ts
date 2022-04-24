@@ -1,18 +1,20 @@
-import Logger, { LogLevel } from "../log";
-import Source from "./source";
-import { FetchMessageObject, ImapFlow } from 'imapflow';
-import config from '../config';
+import { cacheComment } from "../cache";
+import { FetchMessageObject, ImapFlow, MessageAddressObject } from 'imapflow';
 import chalk from 'chalk';
+import config from '../config';
+import Logger, { LogLevel } from "../log";
 import packageInfo from '../../package.json';
-import { stringify, parse } from 'comment-json';
-import fs from 'fs-extra';
-import path from 'path';
-import { KVP } from "../types";
+import Source from "./source";
+import Thing from "../thing/thing";
+
+interface Cache {
+  LastSequence: number; 
+}
 
 /**
  * A connection to a server.
  */
-export default class IMAPSource extends Source {
+export default class IMAPSource extends Source<Cache> {
   /**
    * The flag to add to messages to indicate that we have handled them. Marks them as read by default.
    */
@@ -21,15 +23,15 @@ export default class IMAPSource extends Source {
    * The mailbox to use.
    */
   private readonly mailbox: string;
-  /**
-   * Should the server cache its state between restarts?
-   */
-  private readonly cache: boolean;
     /**
      * The server to use.
      * @type {ImapFlow} The ImapFlow library client.
      */
   private readonly client: ImapFlow;
+  /**
+   * The user used for the mailbox.
+   */
+  private readonly user: string;
   /**
    * The last sequence ID read.
    */
@@ -40,7 +42,6 @@ export default class IMAPSource extends Source {
     this.logger.debug('Creating IMAP server');
     this.flag = config('Flag', '\\Seen', options);
     this.mailbox = config('Mailbox', 'INBOX', options);
-    this.cache = config('Cache', true, options);
     const imapLogger = this.logger.fork([chalk.grey('[imap]')]);
     function imapLog(level: LogLevel, c: any) {
       if (level === 'error' || c.err) {
@@ -51,6 +52,8 @@ export default class IMAPSource extends Source {
         imapLogger.log(level, c)
       }
     }
+    const imapServer = config('Server', Error, options);
+    this.user = imapServer.auth?.user || 'no user';
     this.client = new ImapFlow({
       logger: {
         debug: c => imapLog('debug', c),
@@ -64,7 +67,7 @@ export default class IMAPSource extends Source {
         name: packageInfo.name,
         version: packageInfo.version,
       },
-      ...config('Server', Error, options),
+      ...imapServer,
     });
   }
 
@@ -91,11 +94,10 @@ export default class IMAPSource extends Source {
       }
       for (const message of msgs) {
         this.logMessage(logger, 'debug', message, 'Marking with flag', this.flag);
-        (message as any).server = this;
-        this.emit('message', message);
+        const thing = this.createMessageThing(message);
+        this.emit('message', thing);
         await this.client.messageFlagsAdd((message as any), [this.flag]);
       }
-      await this.saveCache();
     } catch(error) {
       logger.error('Message handler', error);
     } finally {
@@ -103,6 +105,32 @@ export default class IMAPSource extends Source {
       lock.release();
     }
     logger.debug('Finished handling new Message');
+  }
+
+  createMessageThing(message: FetchMessageObject) {
+    return new Thing()
+      .append('id', message.uid)
+      .append('type', 'message')
+      .append('subtype', 'message')
+      .append('name', message.envelope.subject)
+      .append('content', message.bodyParts.get('text')?.toString() || 'no content')
+      .append('source', this.name)
+      .append('origin', this.mail(message.envelope.sender))
+      .append('destination', [
+        ...this.mail(message.envelope.to),
+        ...this.mail(message.envelope.cc),
+        ...this.mail(message.envelope.bcc)
+      ]);
+  }
+
+  mail(a: MessageAddressObject[] | MessageAddressObject): { id: string, name: string }[] {
+    if (!a) {
+      return [];
+    }
+    if (!Array.isArray(a)) {
+      a = [a];
+    }
+    return a.map(v => ({ id: v.address || '', name: v.name || '' }));
   }
 
   /**
@@ -118,8 +146,6 @@ export default class IMAPSource extends Source {
 
     // Wait until client connects and authorizes
     logger.info('Connecting');
-
-    await this.loadCache();
 
     await this.client.connect();
     logger.info('Connected');
@@ -142,50 +168,21 @@ export default class IMAPSource extends Source {
     //await client.logout();
   }
 
-  async saveCache(logger = this.logger.fork([chalk.green('[cache]')])) {
-    if (!this.cache) {
-      return;
-    }
-    logger.debug('Saving cache');
-    const str = stringify({
-      [Symbol.for('before-all')]: [{type: 'LineComment',  value: 'This file contains the cache of the server ' + this.name + '. The file is automatically generated.' }],
-      [Symbol.for('before:LastSequence')] : [{ type: 'LineComment', value: 'The last sequence number handled'}],
+  protected async saveCache() {
+    return {
+      // LastSequence
+      ...cacheComment('before:LastSequence', 'The last sequence number handled'),
       LastSequence: this.lastSeq,
-    }, null, 2);
-    const [file] = await this.cacheFile();
-    await fs.writeFile(file, str, 'utf8');
-    logger.debug('Written file', file);
+    } as Cache;
   }
 
-  async loadCache(logger = this.logger.fork([chalk.green('[cache]')])) {
-    if (!this.cache) {
-      return;
-    }
-    logger.debug('Loading cache');
-    const [file, exists] = await this.cacheFile();
-    if (!exists) {
-      logger.warn('No cache file at', file);
-      return;
-    }
-    logger.debug('Loading file', file);
-    try {
-      const data = await fs.readFile(file, 'utf8');
-      const json = parse(data) as any;
-      this.lastSeq = json.LastSequence || null;
-    } catch(error) {
-      logger.error('Failed to load cache', error);
-    }
+  protected async loadCache(cache: Cache) {
+    this.lastSeq = cache.LastSequence;
   }
 
-  /**
-   * Gets the cache file of the imap server. Ensures its directory exists.
-   * @returns The path of the file and if it exists.
-   */
-  async cacheFile(): Promise<KVP<string, boolean>> {
-    const cacheLocation = config('CacheLocation', './cache');
-    const imapCacheLocation = path.join(cacheLocation, './imap-server/' + this.name);
-    await fs.mkdirp(imapCacheLocation);
-    const file = path.join(imapCacheLocation, './cache.jsonc');
-    return [file, fs.existsSync(file)];
+  public getThing(): Thing {
+    return super.getThing()
+      .append('collection', this.mailbox)
+      .append('user', this.user);
   }
 }
