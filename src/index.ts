@@ -52,7 +52,7 @@ forwardLogger.info('Creating all forwarders');
 const forwards = Object
   .entries(config('Forward', Error))
   .sort(sortEntriesAlphabetically)
-  .map(([name, options]) => new Forward(forwardLogger, name, options));
+  .map(([name, options]) => new Forward(forwardLogger.fork([`[${name}]`]), name, options));
 forwards
   .forEach(async forward => {
     try {
