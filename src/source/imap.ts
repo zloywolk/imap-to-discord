@@ -111,7 +111,7 @@ export default class IMAPSource extends Source<Cache> {
     return new Thing()
       .append('id', message.uid)
       .append('type', 'message')
-      .append('subtype', 'message')
+      .append('subtype', 'imap')
       .append('name', message.envelope.subject)
       .append('content', message.bodyParts.get('text')?.toString() || 'no content')
       .append('origin', this.mail(message.envelope.sender))

@@ -142,7 +142,7 @@ export default class GraphSource extends Source<Cache> {
     return new Thing()
       .append('id', message.id)
       .append('type', 'message')
-      .append('subtype', 'message')
+      .append('subtype', 'graph')
       .append('name', message.subject)
       .append('content', message.body.content)
       .append('origin', this.mail(message.from))
