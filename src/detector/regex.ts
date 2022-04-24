@@ -30,7 +30,7 @@ export default class RegexDetector extends Detector {
   async init() {
     this.key = config('Key', Error, this.options);
     this.pattern = config('Pattern', Error, this.options);
-    this.flags = config('Flags', undefined, this.options);
+    this.flags = config('Flags', '', this.options);
     this.allowMissing = config('AllowMissing', false, this.options);
     this.regex = new RegExp(this.pattern, this.flags)
   }
