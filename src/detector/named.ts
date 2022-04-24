@@ -15,7 +15,11 @@ export default class NamedDetector extends Detector {
   }
 
   async detect(thing: Thing) {
-    return this.case(thing.get<string>('name')) === this.case(this.name);
+    const thingName = this.case(thing.get<string>('name'));
+    const ownName = this.case(this.name);
+    const eq = thingName === ownName;
+    this.logger.debug(`Matching ${thingName} against ${ownName}: ${eq}`);
+    return eq;
   }
 
   /**
