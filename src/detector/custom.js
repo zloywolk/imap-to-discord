@@ -1,10 +1,10 @@
-const Detector = require("./detector");
+const {default: Detector} = require("./detector");
 
 /**
  * Detects using a custom function.
  */
 module.exports = class CustomDetector extends Detector {
-  init() {
+  async init() {
     this.file = path.join(__dirname, '../..', config('File', Error, this.options));
     /**
      * @type {Function}
@@ -16,7 +16,7 @@ module.exports = class CustomDetector extends Detector {
     }
   }
 
-  detect(value) {
+  async detect(value) {
     if (typeof this.module.detect === 'function') {
       return this.module.detect.call(this, value, this);
     } else if (typeof this.module === 'function') {

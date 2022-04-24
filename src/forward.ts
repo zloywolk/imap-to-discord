@@ -1,3 +1,4 @@
+import { MaybeArray } from "./types";
 import { MessageBuilder, Webhook } from "discord-webhook-node";
 import config from "./config";
 import detector from "./detector";
@@ -6,66 +7,111 @@ import formatter from "./formatter";
 import Formatter from "./formatter/formatter";
 import Logger from "./log";
 import Thing from "./thing/thing";
-import { MaybeArray } from "./types";
 
 /**
- * A forward receives mail events and then forwards them to the discord webhook after formatting it if the mail passed the detector.
+ * A forward receives message events and then forwards them to the discord webhook after formatting it if the message passed the detector.
  */
 export default class Forward {
-  private readonly serverLogger: Logger;
-  private readonly mailsLogger: Logger;
-  private readonly server: Detector;
-  private readonly mails: Detector;
+  /**
+   * Source related logs.
+   */
+  private readonly sourceLogger: Logger;
+  /**
+   * Message reladed logs.
+   */
+  private readonly messageLogger: Logger;
+  /**
+   * Format reladed logs.
+   */
+  private readonly formatLogger: Logger;
+  /**
+   * Detector for which sources should be forwarded.
+   */
+  private readonly source: Detector;
+  /**
+   * Detector for which messages should be forwarded.
+   */
+  private readonly messages: Detector;
+  /**
+   * The message formatter.
+   */
   private readonly formatter: Formatter;
+  /**
+   * The discord webhook.
+   */
   private readonly webhook: Webhook;
+  /**
+   * Is this forward exclusively handling messages or allow the message to be handled by multiple forwards?
+   */
   private readonly exclusive: boolean;
 
   constructor(private readonly logger: Logger, public readonly name: string, private readonly options: any) {
     this.logger.debug('Creating forward');
-    this.serverLogger = this.logger.fork(['[server]']);
-    this.mailsLogger = this.logger.fork(['[mails]']);
-    /**
-     * @type {Detector}
-     */
-    this.server = detector(
-      this.serverLogger, 
-      config('Server', undefined, options)
-    ) as Detector;
-    /**
-     * @type {Detector}
-     */
-    this.mails = detector(
-      this.mailsLogger, 
-      config('Mails', undefined, options)
-    ) as Detector;
-    /**
-     * @type {Formatter}
-     */
+    this.sourceLogger = this.logger.fork(['[source]']);
+    this.messageLogger = this.logger.fork(['[message]']);
+    this.formatLogger = this.logger.fork(['[format]']);
+    this.source = detector(
+      this.sourceLogger, 
+      config('Source', undefined, options)
+    );
+    this.messages = detector(
+      this.messageLogger, 
+      config('Message', undefined, options)
+    );
     this.formatter = formatter(
-      this.logger, 
+      this.formatLogger, 
       config('Formatter', undefined, options)
     ) as Formatter;
-    /**
-     * @type {Webhook}
-     */
     this.webhook = new Webhook(config('Webhook', Error, options));
     this.exclusive = config('Exclusive', true, options);
   }
 
-  async forward(thing: Thing) {
+  /**
+   * Initializes the forward.
+   */
+   public async init() {
+    await Promise.all([
+      this.source.init(),
+      this.messages.init(),
+      this.formatter.init(),
+    ]);
+  }
+
+  /**
+   * Forwards the message to the discord webhook.
+   * @param thing The thing to forward
+   * @returns Should the next forward be called?
+   */
+  public async forward(thing: Thing) {
     let hadError = false;
+    // Extend thing with forward data (clear in finally due to possible non-exclusive thing sharing!)
+    thing = thing
+      .append('forward', this.name)
+      .append('forward-thing', new Thing()
+        .append('id', this.name)
+        .append('name', this.name)
+        .append('type', 'forward')
+        .append('subtype', 'discord'));
     try {
       this.logger.debug('New incoming message');
-      /*if (!(await this.server.detect(message.server))) {
-        this.serverLogger.debug('Rejected by server detector');
+      // Detect
+      const sourceThing = thing.get<Thing>('source-thing');
+      this.sourceLogger.debug('Running source detector');
+      if (sourceThing && !(await this.source.detect(sourceThing))) {
+        this.sourceLogger.debug('Rejected by source detector');
         return false;
       }
-      if (!(await this.mails.detect(message))) {
-        this.mailsLogger.debug('Rejected by mails detector');
+      this.sourceLogger.debug('Passed source detector');
+      this.formatLogger.debug('Running messages detector');
+      if (!(await this.messages.detect(thing))) {
+        this.formatLogger.debug('Rejected by messages detector');
         return false;
-      }*/
-      this.logger.info('Will handle incoming message');
+      }
+      this.formatLogger.debug('Passed messages detector');
+      // Format
+      this.formatLogger.info('Formatting incoming message');
       const formats = this.arrayWrap(await this.formatter.format(thing));
+      // Send
       this.logger.debug('Sending', formats.length, 'message(s) to Webhook');
       for (const format of formats) {
         try {
@@ -78,6 +124,7 @@ export default class Forward {
           } catch {}
         }
       }
+      // Done, is exclusive?
       this.logger.debug('Done with forward handling');
       return hadError || this.exclusive;
     } catch(error) {
@@ -86,10 +133,14 @@ export default class Forward {
         await this.webhook.send('Aborting message processing - Error in forward `' + this.name + '`: ' + (error as any)?.message);
       } catch {}
       return true;
+    } finally {
+      thing = thing
+        .clear('forward')
+        .clear('forward-thing');
     }
   }
 
-  arrayWrap(arrayOrItem: MaybeArray<MessageBuilder>) {
+  private arrayWrap(arrayOrItem: MaybeArray<MessageBuilder>) {
     if (Array.isArray(arrayOrItem)) {
       return arrayOrItem;
     }

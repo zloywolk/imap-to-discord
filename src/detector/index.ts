@@ -1,9 +1,11 @@
-const config = require('../config');
-const AllDetector = require('./all');
-const CustomDetector = require('./custom');
-const NamedDetector = require('./named');
+import Logger from "../log";
+import Detector from "./detector";
+import config from '../config';
+import AllDetector from './all';
+import CustomDetector from './custom';
+import NamedDetector from './named';
 
-module.exports = function detector(logger, options) {
+export default function detector(logger: Logger, options: any): Detector {
   if (!options) {
     options = { Type: 'All' };
   }

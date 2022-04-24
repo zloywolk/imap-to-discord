@@ -20,6 +20,11 @@ export default class Thing {
     return this;
   }
 
+  public clear(key: string): this {
+    delete this.values[key];
+    return this;
+  }
+
   public get<T>(key: string): T | undefined {
     return this.values[key] as T;
   }

@@ -16,7 +16,6 @@ export default abstract class Formatter {
     this.type = config('Type', Error, options);
     this.logger.debug('Creating formatter ' + this.type);
     this.turndownService = new TurndownService();
-    this.init();
   }
 
   /**
