@@ -1,5 +1,5 @@
 import 'isomorphic-fetch';
-import config from './config';
+import config, { loadConfig } from './config';
 import chalk from 'chalk';
 import Logger from './log';
 import Forward from './forward';
@@ -14,7 +14,7 @@ const rootLogger = new Logger([
 const env =  process.env.NODE_ENV || 'none';
 rootLogger.info('Environment is', env);
 
-config.load(rootLogger.fork([chalk.red('[config]')]), env);
+loadConfig(rootLogger.fork([chalk.red('[config]')]), env);
 
 const spourceLogger = rootLogger.fork([chalk.cyan('[source]')]);
 spourceLogger.info('Creating all sources');

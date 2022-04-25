@@ -1,14 +1,15 @@
-const fs = require('fs');
-const path = require('path');
-const { parse } = require('comment-json');
-const deepmerge = require('deepmerge');
-const glob = require('glob');
+import fs from 'fs';
+import path from 'path';
+import { parse } from 'comment-json';
+import deepmerge from 'deepmerge';
+import glob from 'glob';
+import Logger from './log';
 
 /**
  * Reads the config file from disk.
- * @returns {Record<string, any>} The config JSON.
+ * @returns The config JSON.
  */
-function readConfig(suffix) {
+function readConfig(suffix?: string) {
   const directory = path.join(__dirname, suffix ? `../appsettings.${suffix}` : '../appsettings');
   logger.debug('Using config directory', directory);
   const fileJson = directory + '.json';
@@ -20,12 +21,12 @@ function readConfig(suffix) {
   if (fs.existsSync(fileJsonc)) {
     files = [fileJsonc, ...files];
   }
-  let values = {};
+  let values: Record<string, any> = {};
   for (const file of files) {
     logger.debug('Reading config file', file);
     const data = fs.readFileSync(file);
     const str = data.toString();
-    const cfg = parse(str);
+    const cfg = parse(str) as Record<string, any>;
     values = deepmerge(values, cfg);
   }
   return values;
@@ -34,22 +35,22 @@ function readConfig(suffix) {
 /**
  * The current config values.
  */
-let config = {};
-let logger;
+let config: Record<string, any> = {};
+let logger: Logger;
 
 /**
  * Gets the config value at the given path.
- * @param {string} path The path.
- * @param {any} def The default value (pass `Error` to raise if missing).
- * @param {cfg} def The config.
- * @returns {any} The config value.
+ * @param path The path.
+ * @param def The default value (pass `Error` to raise if missing).
+ * @param def The config.
+ * @returns The config value.
  * @example
  * get('MigratorSettings:TestSetting')
  * get('MigratorSettings:MissingTestSetting', 'My default value')
  */
-function get(path, def = undefined, cfg = config) {
+export default function get<T = any>(path: string, def: any = undefined, cfg = config): T {
   const els = path.split(':');
-  let current = cfg;
+  let current: any = cfg;
   for (let i = 0; i < els.length; i++) {
     current = current[els[i]];
     if (current === undefined) {
@@ -63,7 +64,13 @@ function get(path, def = undefined, cfg = config) {
   return current;
 } 
 
-get.load = function load(log, env = 'production') {
+/**
+ * Loads the config.
+ * @param log The logger.
+ * @param env The current environment.
+ * @returns The config values
+ */
+export function loadConfig(log: Logger, env = 'production') {
   logger = log;
   logger.info('Loading root config files');
   let values = readConfig();
@@ -78,7 +85,7 @@ get.load = function load(log, env = 'production') {
   return values;
 }
 
-function count(obj) {
+function count(obj: any): number {
   if (obj === null || obj === undefined) {
     return 0;
   }
@@ -97,5 +104,3 @@ function count(obj) {
   }
   return 1;
 }
-
-module.exports = get;

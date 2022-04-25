@@ -12,7 +12,7 @@ export default abstract class Formatter {
   private readonly type: string;
   private readonly turndownService: TurndownService;
 
-  constructor(private readonly logger: Logger, protected readonly options: any) {
+  constructor(protected readonly logger: Logger, protected readonly options: any) {
     this.type = config('Type', Error, options);
     this.logger.debug('Creating formatter ' + this.type);
     this.turndownService = new TurndownService();

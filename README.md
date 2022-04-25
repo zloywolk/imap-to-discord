@@ -44,7 +44,7 @@ First you need to configure server(s) (called "Source" in imap-to-discord) to re
 }
 ```
 
-You have have as many sources of as many types as you want with any desired unique name.
+You can have as many sources of as many types as you want with any desired unique name.
 
 Every `IMAP` source supports the following configuration options:
 

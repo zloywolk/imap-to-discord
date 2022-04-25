@@ -1,9 +1,11 @@
-const config = require('../config');
-const CustomFormatter = require('./custom');
-const {default: DebugFormatter} = require('./debug');
-const {default: DefaultFormatter} = require('./default');
+import config from '../config';
+import CustomFormatter from './custom';
+import DebugFormatter from './debug';
+import DefaultFormatter from './default';
+import Formatter from "./formatter";
+import Logger from "../log";
 
-module.exports = function formatter(logger, options) {
+export default function formatter(logger: Logger, options: any): Formatter {
   if (!options) {
     options = { Type: 'Default' };
   }
