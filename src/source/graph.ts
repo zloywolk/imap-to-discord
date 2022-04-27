@@ -6,6 +6,8 @@ import config from "../config";
 import Logger from "../log";
 import Source from "./source";
 import Thing from "../thing/thing";
+import * as MicrosoftGraph from '@microsoft/microsoft-graph-types';
+import { MaybeArray, MaybeMissing } from "../types";
 
 interface Cache {
   LastId: string;
@@ -92,11 +94,11 @@ export default class GraphSource extends Source<Cache> {
       const res: PageCollection = await this.client.api(`/users/${this.userId}/mailFolders/${this.mailbox}/messages`).select(select).get();
       let newLastId = this.lastId;
       let newLastDate = this.lastDate;
-      const messages: any[] = [];
-      const iterator = new PageIterator(this.client, res, data => {
+      const messages: MicrosoftGraph.Message[] = [];
+      const iterator = new PageIterator(this.client, res, (data: MicrosoftGraph.Message) => {
         // Should dedupe?
-        const id = data.id;
-        const receivedDateTime = new Date(data.receivedDateTime);
+        const id = data.id!;
+        const receivedDateTime = data.receivedDateTime ? new Date(data.receivedDateTime) : new Date();
         switch (this.mailDeduplication) {
           case 'Date': {
             if (receivedDateTime <= this.lastDate) {
@@ -138,20 +140,21 @@ export default class GraphSource extends Source<Cache> {
     }
   }
 
-  createMessageThing(message: any) {
-    return new Thing()
-      .append('id', message.id)
-      .append('type', 'message')
-      .append('subtype', 'graph')
-      .append('name', message.subject)
-      .append('content', message.body.content)
-      .append('origin', this.mail(message.from))
-      .append('destination', this.mail(message.toRecipients));
+  createMessageThing(message: MicrosoftGraph.Message) {
+    return new Thing<MessageThing>({
+      id: message.id!,
+      type: 'message',
+      subtype: 'graph',
+      name:  message.subject || 'no subject',
+      content: message.body?.content || 'no content',
+      origin: this.recipient(message.from),
+      destination: this.recipient(message.toRecipients),
+    });
   }
 
-  mail(a: any): null | { id: string, name: string }[] {
+  recipient(a: MaybeMissing<MaybeArray<MicrosoftGraph.Recipient>>): { id: string, name: string }[] {
     if (!a) {
-      return null;
+      return [];
     }
     if (!Array.isArray(a)) {
       a = [a];
@@ -166,9 +169,9 @@ export default class GraphSource extends Source<Cache> {
     return str;
   }
 
-  public getThing(): Thing {
+  public getThing(): Thing<SourceThing> {
     return super.getThing()
-      .append('collection', this.mailbox)
-      .append('user', this.userId);
+      .clear('collection').append('collection', this.mailbox)
+      .clear('user').append('user', this.userId);
   }
 }

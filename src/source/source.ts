@@ -43,12 +43,15 @@ export default abstract class Source<TCache = CacheData> extends EventEmitter {
    * Represents the source as a thing.
    * @returns The source as a thing.
    */
-  public getThing(): Thing {
-    return new Thing()
-      .append('id', this.name)
-      .append('type', 'source')
-      .append('subtype', this.type)
-      .append('name', this.name);
+  public getThing(): Thing<SourceThing> {
+    return new Thing<SourceThing>({
+      id: this.name,
+      type: 'source',
+      subtype: this.type,
+      name: this.name,
+      user: '',
+      collection: '',
+    });
   }
 
   /**

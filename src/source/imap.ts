@@ -6,6 +6,7 @@ import Logger, { LogLevel } from "../log";
 import packageInfo from '../../package.json';
 import Source from "./source";
 import Thing from "../thing/thing";
+import { MaybeArray } from "../types";
 
 interface Cache {
   LastSequence: number; 
@@ -108,21 +109,22 @@ export default class IMAPSource extends Source<Cache> {
   }
 
   createMessageThing(message: FetchMessageObject) {
-    return new Thing()
-      .append('id', message.uid)
-      .append('type', 'message')
-      .append('subtype', 'imap')
-      .append('name', message.envelope.subject)
-      .append('content', message.bodyParts.get('text')?.toString() || 'no content')
-      .append('origin', this.mail(message.envelope.sender))
-      .append('destination', [
+    return new Thing<MessageThing>({
+      id: message.uid.toString(),
+      type: 'message',
+      subtype: 'imap',
+      name:  message.envelope.subject,
+      content: message.bodyParts.get('text')?.toString() || 'no content',
+      origin: this.mail(message.envelope.sender),
+      destination: [
         ...this.mail(message.envelope.to),
         ...this.mail(message.envelope.cc),
         ...this.mail(message.envelope.bcc)
-      ]);
+      ],
+    });
   }
 
-  mail(a: MessageAddressObject[] | MessageAddressObject): { id: string, name: string }[] {
+  mail(a: MaybeArray<MessageAddressObject>): { id: string, name: string }[] {
     if (!a) {
       return [];
     }
@@ -179,9 +181,9 @@ export default class IMAPSource extends Source<Cache> {
     this.lastSeq = cache.LastSequence;
   }
 
-  public getThing(): Thing {
+  public getThing(): Thing<SourceThing> {
     return super.getThing()
-      .append('collection', this.mailbox)
-      .append('user', this.user);
+      .clear('collection').append('collection', this.mailbox)
+      .clear('user').append('user', this.user);
   }
 }
