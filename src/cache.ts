@@ -47,5 +47,5 @@ export function cacheComment(target: string, comment: string): CommentObject {
   } as CommentToken));
   return {
     [Symbol.for(target)]: tokens as any as CommentToken,
-  };
+  } as any as CommentObject;
 }
