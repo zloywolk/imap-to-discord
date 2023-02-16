@@ -3,7 +3,7 @@ version: '3.5'
 services:
   imaptodiscord:
     container_name: imaptodiscord
-    image: imaptodiscord
+    image: aeroshenko/imaptodiscord
     environment:
       - NODE_ENV=development
     volumes:
