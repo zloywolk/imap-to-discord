@@ -297,7 +297,7 @@ version: '3.5'
 services:
   imaptodiscord:
     container_name: imaptodiscord
-    image: sahnee/imaptodiscord:latest
+    image: aeroshenko/imaptodiscord:latest
     volumes:
        - <APPSETTINGS_LOCATION>:/imaptodiscord/appsettings
        - <CACHE_LOCATION>:/imaptodiscord/cache
