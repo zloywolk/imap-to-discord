@@ -1,4 +1,5 @@
 # imap-to-discord
+![build](https://github.com/zloywolk/imap-to-discord/actions/workflows/main.yml/badge.svg)
 
 Forward mails in an IMAP mailbox or Microsoft Azure to a discord webhook.
 
