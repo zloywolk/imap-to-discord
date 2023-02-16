@@ -1,14 +1,15 @@
 {
   "name": "imap-to-discord",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Receives e-mails and forwards them to a discord webhook",
   "main": "src/index.ts",
   "scripts": {
-    "start": "cross-env NODE_ENV=development ts-node ."
+    "start:dev": "cross-env NODE_ENV=development ts-node .",
+    "start": "cross-env NODE_ENV=production ts-node ."
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PatrickSachs/imap-to-discord.git"
+    "url": "git+https://github.com/zloywolk/imap-to-discord.git"
   },
   "keywords": [
     "imap",
@@ -17,12 +18,12 @@
     "webhook",
     "forward"
   ],
-  "author": "Sahnee.dev",
+  "author": "Sahnee.dev, Andrey A. Eroshenko",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/PatrickSachs/imap-to-discord/issues"
+    "url": "https://github.com/zloywolk/imap-to-discord/issues"
   },
-  "homepage": "https://github.com/PatrickSachs/imap-to-discord#readme",
+  "homepage": "https://github.com/zloywolk/imap-to-discord#readme",
   "dependencies": {
     "@azure/identity": "^2.0.4",
     "@microsoft/microsoft-graph-client": "^3.0.2",
@@ -35,6 +36,7 @@
     "imap": "^0.8.19",
     "imapflow": "^1.0.88",
     "isomorphic-fetch": "^3.0.0",
+    "mailparser": "^3.6.3",
     "ts-node": "^10.7.0",
     "turndown": "^7.1.1"
   },
@@ -42,7 +44,8 @@
     "@types/fs-extra": "^9.0.13",
     "@types/glob": "^7.2.0",
     "@types/imapflow": "^1.0.9",
-    "@types/node": "^17.0.25",
+    "@types/mailparser": "^3.4.0",
+    "@types/node": "^17.0.45",
     "@types/turndown": "^5.0.1",
     "cross-env": "^7.0.3",
     "typescript": "^4.6.3"
