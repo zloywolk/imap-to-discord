@@ -6,6 +6,8 @@ import Logger, { LogLevel } from "../log";
 import packageInfo from '../../package.json';
 import Source from "./source";
 import Thing from "../thing/thing";
+import {simpleParser} from 'mailparser';
+
 
 interface Cache {
   LastSequence: number; 
@@ -86,7 +88,7 @@ export default class IMAPSource extends Source<Cache> {
       for await (const message of this.client.fetch((this.lastSeq === null ? 0 : this.lastSeq + 1) + ':*', {
         envelope: true,
         flags: true,
-        bodyParts: ['TEXT'],
+        source: true
       })) { // TODO: Or via date? { since: ... }
         this.logMessage(logger, 'info', message, 'New Message', { lastSeq: this.lastSeq });
         this.lastSeq = message.seq;
@@ -94,7 +96,7 @@ export default class IMAPSource extends Source<Cache> {
       }
       for (const message of msgs) {
         this.logMessage(logger, 'debug', message, 'Marking with flag', this.flag);
-        const thing = this.createMessageThing(message);
+        const thing = await this.createMessageThing(message);
         this.emit('message', thing);
         await this.client.messageFlagsAdd((message as any), [this.flag]);
       }
@@ -107,13 +109,19 @@ export default class IMAPSource extends Source<Cache> {
     logger.debug('Finished handling new Message');
   }
 
-  createMessageThing(message: FetchMessageObject) {
+  async parseMailBody(source: Buffer) {
+    const parsed = await (await simpleParser(source));
+    return parsed.html || parsed.text;
+  }
+
+  async createMessageThing(message: FetchMessageObject) {
     return new Thing()
       .append('id', message.uid)
       .append('type', 'message')
       .append('subtype', 'imap')
       .append('name', message.envelope.subject)
-      .append('content', message.bodyParts.get('text')?.toString() || 'no content')
+      .append('content', await this.parseMailBody(message.source))
+      // .append('content', message.bodyParts.get('text')?.toString() || 'no content')
       .append('origin', this.mail(message.envelope.sender))
       .append('destination', [
         ...this.mail(message.envelope.to),
